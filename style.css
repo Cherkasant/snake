@@ -54,7 +54,8 @@ canvas#game {
     gap: 12px;
 }
 
-button#restart {
+button#restart,
+button#speed {
     padding: 8px 14px;
     border-radius: 8px;
     border: 1px solid #374151;
@@ -63,7 +64,8 @@ button#restart {
     cursor: pointer;
 }
 
-button#restart:hover {
+button#restart:hover,
+button#speed:hover {
     filter: brightness(1.1);
 }
 

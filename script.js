@@ -3,6 +3,7 @@
     const ctx = canvas.getContext('2d');
     const scoreEl = document.getElementById('score');
     const restartBtn = document.getElementById('restart');
+    const speedBtn = document.getElementById('speed');
 
     // Logical grid size (independent of CSS size)
     const gridCellSize = 20; // pixels per cell in canvas space
@@ -14,7 +15,13 @@
     let nextDirection = { x: 1, y: 0 };
     let food = spawnFood();
     let score = 0;
-    let speedMs = 120; // lower is faster
+    let speedMs = 120; // effective speed in ms between ticks (lower is faster)
+    const baseSpeedMs = 120; // starting speed
+    const minSpeedMs = 60; // minimum speed cap
+    // dynamicSpeedMs decreases as score increases; speedMs = dynamicSpeedMs * modeMultiplier
+    let dynamicSpeedMs = baseSpeedMs;
+    const speedModes = ['Slow', 'Normal', 'Fast'];
+    let speedModeIndex = 1; // Normal
     let lastTick = 0;
     let gameOver = false;
 
@@ -35,7 +42,8 @@
         nextDirection = { x: 1, y: 0 };
         food = spawnFood();
         score = 0;
-        speedMs = 120;
+        dynamicSpeedMs = baseSpeedMs;
+        applySpeedMode();
         lastTick = 0;
         gameOver = false;
         scoreEl.textContent = String(score);
@@ -72,8 +80,9 @@
         if (ateFood) {
             score += 1;
             scoreEl.textContent = String(score);
-            // Slightly speed up
-            speedMs = Math.max(60, speedMs - 2);
+            // Slightly speed up base pace, then apply mode multiplier
+            dynamicSpeedMs = Math.max(minSpeedMs, dynamicSpeedMs - 2);
+            applySpeedMode();
             food = spawnFood();
         } else {
             snake.pop();
@@ -187,8 +196,20 @@
     // Events
     window.addEventListener('keydown', handleKey);
     restartBtn.addEventListener('click', resetGame);
+    speedBtn.addEventListener('click', () => {
+        speedModeIndex = (speedModeIndex + 1) % speedModes.length;
+        applySpeedMode();
+    });
+
+    function applySpeedMode() {
+        const mode = speedModes[speedModeIndex];
+        const multiplier = mode === 'Slow' ? 1.25 : mode === 'Fast' ? 0.75 : 1.0;
+        speedMs = Math.max(minSpeedMs, Math.round(dynamicSpeedMs * multiplier));
+        if (speedBtn) speedBtn.textContent = `Speed: ${mode}`;
+    }
 
     // Initial draw and start
+    applySpeedMode();
     draw(false);
     window.requestAnimationFrame(loop);
 })();
