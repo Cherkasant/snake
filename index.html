@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake - Simple JS Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Snake</h1>
+            <div class="scoreboard">
+                <span>Score: </span><span id="score">0</span>
+            </div>
+        </header>
+        <canvas id="game" width="400" height="400" aria-label="Snake game canvas" role="img"></canvas>
+        <div class="controls">
+            <button id="restart" aria-label="Restart game">Restart</button>
+        </div>
+        <footer>
+            <p>Use arrow keys or WASD to move. Avoid walls and yourself.</p>
+        </footer>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
+
+
