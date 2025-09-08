@@ -1,0 +1,15 @@
+{
+  "name": "snake-game",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simple Snake game in TypeScript",
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -w -p ."
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
+
+

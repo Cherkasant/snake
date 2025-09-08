@@ -1,33 +1,37 @@
 (function() {
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const scoreEl = document.getElementById('score');
-    const restartBtn = document.getElementById('restart');
-    const speedBtn = document.getElementById('speed');
+    const canvas = document.getElementById('game') as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+    const scoreEl = document.getElementById('score') as HTMLSpanElement;
+    const restartBtn = document.getElementById('restart') as HTMLButtonElement;
+    const speedBtn = document.getElementById('speed') as HTMLButtonElement | null;
+
+    type Point = { x: number; y: number };
 
     // Logical grid size (independent of CSS size)
     const gridCellSize = 20; // pixels per cell in canvas space
     const gridCells = canvas.width / gridCellSize; // assumes square
 
     // Game state
-    let snake = [{ x: 8, y: 10 }];
-    let direction = { x: 1, y: 0 }; // moving right initially
-    let nextDirection = { x: 1, y: 0 };
-    let food = spawnFood();
+    let snake: Point[] = [{ x: 8, y: 10 }];
+    let direction: Point = { x: 1, y: 0 }; // moving right initially
+    let nextDirection: Point = { x: 1, y: 0 };
+    let food: Point = spawnFood();
     let score = 0;
     let speedMs = 120; // effective speed in ms between ticks (lower is faster)
     const baseSpeedMs = 120; // starting speed
     const minSpeedMs = 60; // minimum speed cap
     // dynamicSpeedMs decreases as score increases; speedMs = dynamicSpeedMs * modeMultiplier
     let dynamicSpeedMs = baseSpeedMs;
-    const speedModes = ['Slow', 'Normal', 'Fast'];
+    const speedModes = ['Slow', 'Normal', 'Fast'] as const;
+    type SpeedMode = typeof speedModes[number];
     let speedModeIndex = 1; // Normal
     let lastTick = 0;
     let gameOver = false;
 
-    function spawnFood() {
+    function spawnFood(): Point {
+        // eslint-disable-next-line no-constant-condition
         while (true) {
-            const position = {
+            const position: Point = {
                 x: Math.floor(Math.random() * gridCells),
                 y: Math.floor(Math.random() * gridCells)
             };
@@ -36,7 +40,7 @@
         }
     }
 
-    function resetGame() {
+    function resetGame(): void {
         snake = [{ x: 8, y: 10 }];
         direction = { x: 1, y: 0 };
         nextDirection = { x: 1, y: 0 };
@@ -50,7 +54,7 @@
         window.requestAnimationFrame(loop);
     }
 
-    function loop(timestamp) {
+    function loop(timestamp: number): void {
         if (gameOver) return;
         if (timestamp - lastTick < speedMs) {
             window.requestAnimationFrame(loop);
@@ -60,7 +64,7 @@
 
         // Update
         direction = nextDirection;
-        const newHead = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+        const newHead: Point = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
 
         // Wall collision
         if (newHead.x < 0 || newHead.y < 0 || newHead.x >= gridCells || newHead.y >= gridCells) {
@@ -92,7 +96,7 @@
         window.requestAnimationFrame(loop);
     }
 
-    function draw(showGameOver) {
+    function draw(showGameOver: boolean): void {
         // Background
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -136,7 +140,7 @@
         }
     }
 
-    function roundedRect(x, y, w, h, r) {
+    function roundedRect(x: number, y: number, w: number, h: number, r: number): void {
         ctx.beginPath();
         ctx.moveTo(x + r, y);
         ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -146,7 +150,7 @@
         ctx.closePath();
     }
 
-    function handleKey(e) {
+    function handleKey(e: KeyboardEvent): void {
         const key = e.key.toLowerCase();
         const isHorizontal = direction.x !== 0;
         const isVertical = direction.y !== 0;
@@ -167,13 +171,13 @@
         let touchStartX = 0;
         let touchStartY = 0;
         let active = false;
-        canvas.addEventListener('touchstart', (e) => {
+        canvas.addEventListener('touchstart', (e: TouchEvent) => {
             active = true;
             const t = e.touches[0];
             touchStartX = t.clientX;
             touchStartY = t.clientY;
         }, { passive: true });
-        canvas.addEventListener('touchmove', (e) => {
+        canvas.addEventListener('touchmove', (e: TouchEvent) => {
             if (!active) return;
             const t = e.touches[0];
             const dx = t.clientX - touchStartX;
@@ -196,13 +200,15 @@
     // Events
     window.addEventListener('keydown', handleKey);
     restartBtn.addEventListener('click', resetGame);
-    speedBtn.addEventListener('click', () => {
-        speedModeIndex = (speedModeIndex + 1) % speedModes.length;
-        applySpeedMode();
-    });
+    if (speedBtn) {
+        speedBtn.addEventListener('click', () => {
+            speedModeIndex = (speedModeIndex + 1) % speedModes.length;
+            applySpeedMode();
+        });
+    }
 
-    function applySpeedMode() {
-        const mode = speedModes[speedModeIndex];
+    function applySpeedMode(): void {
+        const mode: SpeedMode = speedModes[speedModeIndex];
         const multiplier = mode === 'Slow' ? 1.25 : mode === 'Fast' ? 0.75 : 1.0;
         speedMs = Math.max(minSpeedMs, Math.round(dynamicSpeedMs * multiplier));
         if (speedBtn) speedBtn.textContent = `Speed: ${mode}`;
