@@ -10,6 +10,10 @@ html, body {
     color: #e5e7eb;
 }
 
+#root {
+    height: 100%;
+}
+
 .container {
     min-height: 100%;
     display: flex;
@@ -40,9 +44,9 @@ h1 {
     padding: 6px 10px;
 }
 
-canvas#game {
-    width: min(90vmin, 480px);
-    height: min(90vmin, 480px);
+canvas {
+    width: min(90vmin, 720px);
+    height: min(90vmin, 720px);
     border: 2px solid #374151;
     background: #0f172a;
     border-radius: 8px;
@@ -54,23 +58,20 @@ canvas#game {
     gap: 12px;
 }
 
-button#restart,
-button#speed {
+button {
     padding: 8px 14px;
     border-radius: 8px;
     border: 1px solid #374151;
     background: linear-gradient(180deg, #1f2937, #111827);
     color: #e5e7eb;
     cursor: pointer;
+    font-family: inherit;
 }
 
-button#restart:hover,
-button#speed:hover {
+button:hover {
     filter: brightness(1.1);
 }
 
 footer {
     opacity: 0.8;
 }
-
-
