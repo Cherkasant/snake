@@ -5,7 +5,8 @@
   "description": "Simple Snake game in TypeScript",
   "scripts": {
     "build": "tsc -p .",
-    "watch": "tsc -w -p ."
+    "watch": "tsc -w -p .",
+    "start": "node server.js"
   },
   "devDependencies": {
     "typescript": "^5.5.4"
