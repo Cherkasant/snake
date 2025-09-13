@@ -35,6 +35,7 @@ const SnakeGame: React.FC = () => {
   const [, setFoodLog] = useAtom(foodLogAtom)
   const [recentFoods, setRecentFoods] = useAtom(recentFoodsAtom)
   const [isRespawnScheduled, setIsRespawnScheduled] = useState<boolean>(false)
+  const [isStarted, setIsStarted] = useState<boolean>(false)
 
   // Refs to access current state in callbacks
   const snakeRef = useRef(snake)
@@ -97,7 +98,9 @@ const SnakeGame: React.FC = () => {
 
   // Reset game
   const resetGame = useCallback(() => {
+    setIsStarted(false)
     setIsRespawnScheduled(false)
+    setFoods([]) // Clear food on reset
     setSnake([{ x: 15, y: 15 }])
     setDirection({ x: 1, y: 0 })
     setNextDirection({ x: 1, y: 0 })
@@ -106,34 +109,28 @@ const SnakeGame: React.FC = () => {
     setFoodLog([]) // Reset food log on game restart
     setRecentFoods([]) // Reset recent foods on restart
     lastTickRef.current = 0
-    initFood()
-  }, [initFood, setSnake, setDirection, setNextDirection, setScore, setGameOver, setFoodLog, setRecentFoods])
+    // Food spawned in startGame
+  }, [setSnake, setDirection, setNextDirection, setScore, setGameOver, setFoodLog, setRecentFoods, setIsStarted, setFoods])
 
 
 
 
-  // Initialize game on mount
-  const isInitialMount = useRef(true);
+  // Initialize initial state on mount, but don't start game
   useEffect(() => {
-    if (isInitialMount.current) {
-      resetGame();
-      isInitialMount.current = false;
-    }
-  }, [])
-
-  // Initialize game on first render
-  useEffect(() => {
-    resetGame();
-  }, [])
-
-  // Initialize game on mount
-  useEffect(() => {
-    resetGame();
+    setSnake([{ x: 15, y: 15 }])
+    setDirection({ x: 1, y: 0 })
+    setNextDirection({ x: 1, y: 0 })
+    setScore(0)
+    setGameOver(false)
+    setFoodLog([])
+    setRecentFoods([])
+    lastTickRef.current = 0
+    // Food spawned in startGame
   }, [])
 
   // Game loop
   const gameLoop = useCallback((timestamp: number) => {
-    if (gameOver) return
+    if (gameOver || !isStarted) return
 
     // Snake movement timing
     const speedMs = getCurrentSpeed()
@@ -174,14 +171,15 @@ const SnakeGame: React.FC = () => {
           setScore(prevScore => prevScore + 1)
           setFoods([]) // Remove food
           
-          // Schedule new food to appear after 5 seconds if not already scheduled
+          // Calculate respawn delay based on difficulty
+          const respawnDelay = difficulty === 'Easy' ? 1500 : difficulty === 'Hard' ? 500 : 1000
           if (!isRespawnScheduled) {
             setIsRespawnScheduled(true)
             setTimeout(() => {
               const newFoods = spawnFood()
               setFoods(newFoods)
               setIsRespawnScheduled(false)
-            }, 1000) // Reduced respawn delay to 1 second
+            }, respawnDelay)
           }
           
           return newSnake
@@ -194,9 +192,9 @@ const SnakeGame: React.FC = () => {
     gameLoopRef.current = requestAnimationFrame(gameLoop)
   }, [gameOver, nextDirection, getCurrentSpeed, spawnFood, setSnake, setDirection, setGameOver, setScore, setFoods, foods])
 
-  // Start game loop
+  // Start game loop only if started
   useEffect(() => {
-    if (!gameOver) {
+    if (isStarted && !gameOver) {
       gameLoopRef.current = requestAnimationFrame(gameLoop)
     }
     return () => {
@@ -204,7 +202,7 @@ const SnakeGame: React.FC = () => {
         cancelAnimationFrame(gameLoopRef.current)
       }
     }
-  }, [gameLoop, gameOver])
+  }, [gameLoop, gameOver, isStarted])
 
   // Draw function - now takes snake, foods and theme as parameters
   const draw = useCallback((ctx: CanvasRenderingContext2D, showGameOver: boolean, snake: Point[], foods: Point[], theme: 'dark' | 'light') => {
@@ -272,14 +270,14 @@ const SnakeGame: React.FC = () => {
   // Draw on canvas when state changes
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas) return
+    if (!canvas || !isStarted) return
 
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
     console.log(`Drawing frame - Foods: ${foods.length} items with ${theme} theme`)
     draw(ctx, gameOver, snake, foods, theme)
-  }, [snake, gameOver, foods, theme, draw])
+  }, [snake, gameOver, foods, theme, draw, isStarted])
 
   // Keyboard controls
   const handleKey = useCallback((e: KeyboardEvent) => {
@@ -341,7 +339,15 @@ const SnakeGame: React.FC = () => {
   }, [handleKey])
   
 
-  // Difficulty toggle
+  // Start game function
+  const startGame = () => {
+    setIsStarted(true)
+    setGameOver(false)
+    lastTickRef.current = performance.now()
+    initFood()
+  }
+
+  // Difficulty toggle (for in-game)
   const toggleDifficulty = () => {
     setDifficulty(prev => {
       if (prev === 'Easy') return 'Medium'
@@ -356,6 +362,43 @@ const SnakeGame: React.FC = () => {
 
   // Food is static - no movement
 
+  // Difficulty selector for start screen
+  const handleDifficultyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setDifficulty(e.target.value as 'Easy' | 'Medium' | 'Hard')
+  }
+
+  if (!isStarted) {
+    return (
+      <div className="container">
+        <h1>Snake Game</h1>
+        <div className="start-screen">
+          <div className="select-container">
+            <label htmlFor="difficulty">Select Difficulty:</label>
+            <select id="difficulty" className="difficulty-select" value={difficulty} onChange={handleDifficultyChange}>
+              <option value="Easy">Easy</option>
+              <option value="Medium">Medium</option>
+              <option value="Hard">Hard</option>
+            </select>
+          </div>
+          <p className="difficulty-desc">Easy: Slower snake (180ms), food respawn 1.5s</p>
+          <p className="difficulty-desc">Medium: Balanced speed (120ms), respawn 1s</p>
+          <p className="difficulty-desc">Hard: Faster snake (90ms), respawn 0.5s</p>
+          <div className="button-group">
+            <button onClick={startGame} aria-label="Start game">
+              Start Game
+            </button>
+            <button onClick={toggleTheme} aria-label="Toggle theme">
+              Theme: {theme === 'dark' ? 'Dark' : 'Light'}
+            </button>
+          </div>
+        </div>
+        <footer>
+          <p>Use arrow keys or WASD to move. Touch/swipe on mobile.</p>
+        </footer>
+      </div>
+    )
+  }
+
   return (
     <div className="container">
       <header>
@@ -367,11 +410,11 @@ const SnakeGame: React.FC = () => {
           <span>Difficulty: </span><span>{difficulty}</span>
         </div>
       </header>
-      <canvas 
+      <canvas
         ref={canvasRef}
-        width={600} 
-        height={600} 
-        aria-label="Snake game canvas" 
+        width={600}
+        height={600}
+        aria-label="Snake game canvas"
         role="img"
         onTouchStart={handleTouchStart}
       />
