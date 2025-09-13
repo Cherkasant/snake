@@ -31,7 +31,7 @@ const SnakeGame: React.FC = () => {
   const [gameOver, setGameOver] = useAtom(gameOverAtom)
   const [speedMode, setSpeedMode] = useAtom(speedModeAtom)
   const [theme, setTheme] = useAtom(themeAtom)
-  const [foodLog, setFoodLog] = useAtom(foodLogAtom)
+  const [, setFoodLog] = useAtom(foodLogAtom)
   const [recentFoods, setRecentFoods] = useAtom(recentFoodsAtom)
   const [isRespawnScheduled, setIsRespawnScheduled] = useState<boolean>(false)
 
@@ -48,7 +48,6 @@ const SnakeGame: React.FC = () => {
   const gridCellSize = 20
   const gridCells = 30 // 600px / 20px per cell (50% more space)
   const baseSpeedMs = 120
-  const minSpeedMs = 60
   // Food is static - no movement
 
   // Calculate current speed based on mode only (no score acceleration)
