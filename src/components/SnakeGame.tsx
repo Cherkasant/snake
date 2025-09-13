@@ -1,27 +1,48 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { atom, useAtom } from 'jotai'
 
 type Point = { x: number; y: number }
+
+// Define Jotai atoms
+const snakeAtom = atom<Point[]>([{ x: 15, y: 15 }])
+const directionAtom = atom<Point>({ x: 1, y: 0 })
+const nextDirectionAtom = atom<Point>({ x: 1, y: 0 })
+const foodsAtom = atom<Point[]>([])
+const scoreAtom = atom<number>(0)
+const gameOverAtom = atom<boolean>(false)
+const speedModeAtom = atom<'Slow' | 'Normal' | 'Fast'>('Normal')
+const themeAtom = atom<'dark' | 'light'>('dark')
+// Food log for analysis
+const foodLogAtom = atom<{position: Point, timestamp: number}[]>([])
+// Track recent food positions to avoid repetition
+const recentFoodsAtom = atom<Point[]>([])
 
 const SnakeGame: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const gameLoopRef = useRef<number>()
   const lastTickRef = useRef<number>(0)
 
-  // Game state
-  const [snake, setSnake] = useState<Point[]>([{ x: 15, y: 15 }])
-  const [direction, setDirection] = useState<Point>({ x: 1, y: 0 })
-  const [nextDirection, setNextDirection] = useState<Point>({ x: 1, y: 0 })
-  const [food, setFood] = useState<Point>({ x: 0, y: 0 })
-  const [score, setScore] = useState<number>(0)
-  const [gameOver, setGameOver] = useState<boolean>(false)
-  const [speedMode, setSpeedMode] = useState<'Slow' | 'Normal' | 'Fast'>('Normal')
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  // Game state with Jotai
+  const [snake, setSnake] = useAtom(snakeAtom)
+  const [direction, setDirection] = useAtom(directionAtom)
+  const [nextDirection, setNextDirection] = useAtom(nextDirectionAtom)
+  const [foods, setFoods] = useAtom(foodsAtom)
+  const [score, setScore] = useAtom(scoreAtom)
+  const [gameOver, setGameOver] = useAtom(gameOverAtom)
+  const [speedMode, setSpeedMode] = useAtom(speedModeAtom)
+  const [theme, setTheme] = useAtom(themeAtom)
+  const [foodLog, setFoodLog] = useAtom(foodLogAtom)
+  const [recentFoods, setRecentFoods] = useAtom(recentFoodsAtom)
+  const [isRespawnScheduled, setIsRespawnScheduled] = useState<boolean>(false)
 
-  // Use ref to track current snake state
-  const snakeRef = useRef<Point[]>(snake)
+  // Refs to access current state in callbacks
+  const snakeRef = useRef(snake)
+  const recentFoodsRef = useRef(recentFoods)
+  
   useEffect(() => {
     snakeRef.current = snake
-  }, [snake])
+    recentFoodsRef.current = recentFoods
+  }, [snake, recentFoods])
 
   // Game constants
   const gridCellSize = 20
@@ -30,50 +51,83 @@ const SnakeGame: React.FC = () => {
   const minSpeedMs = 60
   // Food is static - no movement
 
-  // Calculate current speed based on score and mode
+  // Calculate current speed based on mode only (no score acceleration)
   const getCurrentSpeed = useCallback(() => {
-    const dynamicSpeed = Math.max(minSpeedMs, baseSpeedMs - score * 2)
     const multiplier = speedMode === 'Slow' ? 1.25 : speedMode === 'Fast' ? 0.75 : 1.0
-    return Math.max(minSpeedMs, Math.round(dynamicSpeed * multiplier))
-  }, [score, speedMode])
+    return Math.round(baseSpeedMs * multiplier)
+  }, [speedMode])
 
   // Food is static - doesn't move
 
 
-  // Spawn food (static - no direction)
-  const spawnFood = useCallback((): Point => {
+  // Spawn single food item (static - no direction)
+  const spawnFood = useCallback((): Point[] => {
     while (true) {
       const position: Point = {
         x: Math.floor(Math.random() * gridCells),
         y: Math.floor(Math.random() * gridCells)
       }
-      // Use snakeRef.current to get the latest snake state
+      // Check if position is on snake
       const onSnake = snakeRef.current.some(s => s.x === position.x && s.y === position.y)
-      if (!onSnake) {
-        console.log(`Spawning food at (${position.x}, ${position.y})`)
-        return position
+      const inRecent = recentFoodsRef.current.some(f => f.x === position.x && f.y === position.y)
+      if (!onSnake && !inRecent) {
+        // Log food position with timestamp
+        setFoodLog(prev => [...prev, {
+          position: {x: position.x, y: position.y},
+          timestamp: Date.now()
+        }])
+        // Update recent foods (keep last 5 positions)
+        setRecentFoods(prev => {
+          const updated = [...prev, position]
+          return updated.length > 5 ? updated.slice(1) : updated
+        })
+        return [position]
       }
     }
-  }, [gridCells]) // Only depends on gridCells
+  }, [gridCells, snake]) // Depends on gridCells and current snake state
+
+  // Initialize food separately
+  const initFood = useCallback(() => {
+    const newFoods = spawnFood()
+    console.log(`Initial foods: ${newFoods.length} items`)
+    setFoods(newFoods)
+  }, [spawnFood, setFoods])
 
   // Reset game
   const resetGame = useCallback(() => {
+    setIsRespawnScheduled(false)
     setSnake([{ x: 15, y: 15 }])
     setDirection({ x: 1, y: 0 })
     setNextDirection({ x: 1, y: 0 })
     setScore(0)
     setGameOver(false)
+    setFoodLog([]) // Reset food log on game restart
+    setRecentFoods([]) // Reset recent foods on restart
     lastTickRef.current = 0
-    const newFood = spawnFood()
-    console.log(`Initial food position: (${newFood.x}, ${newFood.y})`)
-    setFood(newFood)
-  }, [spawnFood])
+    initFood()
+  }, [initFood, setSnake, setDirection, setNextDirection, setScore, setGameOver, setFoodLog, setRecentFoods])
 
-  // Initialize food on first render
+
+
+
+  // Initialize game on mount
+  const isInitialMount = useRef(true);
   useEffect(() => {
-    setFood(spawnFood())
-  }, [spawnFood])
+    if (isInitialMount.current) {
+      resetGame();
+      isInitialMount.current = false;
+    }
+  }, [])
 
+  // Initialize game on first render
+  useEffect(() => {
+    resetGame();
+  }, [])
+
+  // Initialize game on mount
+  useEffect(() => {
+    resetGame();
+  }, [])
 
   // Game loop
   const gameLoop = useCallback((timestamp: number) => {
@@ -89,9 +143,9 @@ const SnakeGame: React.FC = () => {
 
     setSnake(prevSnake => {
       setDirection(nextDirection)
-      const newHead: Point = { 
-        x: prevSnake[0].x + nextDirection.x, 
-        y: prevSnake[0].y + nextDirection.y 
+      const newHead: Point = {
+        x: prevSnake[0].x + nextDirection.x,
+        y: prevSnake[0].y + nextDirection.y
       }
 
       // Wall collision
@@ -107,23 +161,36 @@ const SnakeGame: React.FC = () => {
       }
 
       const newSnake = [newHead, ...prevSnake]
-      // Use foodRef to get the current food position
-      const ateFood = newHead.x === foodRef.current.x && newHead.y === foodRef.current.y
+      
+      // Check if head collides with food
+      if (foods.length > 0) {
+        const foodIndex = foods.findIndex(f => f.x === newHead.x && f.y === newHead.y)
+        const ateFood = foodIndex !== -1
 
-      if (ateFood) {
-        console.log(`Food eaten at (${foodRef.current.x}, ${foodRef.current.y})! Respawning new food`)
-        const newFoodPos = spawnFood()
-        console.log(`New food position: (${newFoodPos.x}, ${newFoodPos.y})`)
-        setScore(prevScore => prevScore + 1)
-        setFood(newFoodPos)
-        return newSnake
-      } else {
-        return newSnake.slice(0, -1)
+        if (ateFood) {
+          console.log(`Food eaten at (${foods[foodIndex].x}, ${foods[foodIndex].y})!`)
+          setScore(prevScore => prevScore + 1)
+          setFoods([]) // Remove food
+          
+          // Schedule new food to appear after 5 seconds if not already scheduled
+          if (!isRespawnScheduled) {
+            setIsRespawnScheduled(true)
+            setTimeout(() => {
+              const newFoods = spawnFood()
+              setFoods(newFoods)
+              setIsRespawnScheduled(false)
+            }, 1000) // Reduced respawn delay to 1 second
+          }
+          
+          return newSnake
+        }
       }
+
+      return newSnake.slice(0, -1)
     })
 
     gameLoopRef.current = requestAnimationFrame(gameLoop)
-  }, [gameOver, nextDirection, food, getCurrentSpeed, spawnFood])
+  }, [gameOver, nextDirection, getCurrentSpeed, spawnFood, setSnake, setDirection, setGameOver, setScore, setFoods, foods])
 
   // Start game loop
   useEffect(() => {
@@ -137,8 +204,8 @@ const SnakeGame: React.FC = () => {
     }
   }, [gameLoop, gameOver])
 
-  // Draw function - now takes snake, food and theme as parameters
-  const draw = useCallback((ctx: CanvasRenderingContext2D, showGameOver: boolean, snake: Point[], food: Point, theme: 'dark' | 'light') => {
+  // Draw function - now takes snake, foods and theme as parameters
+  const draw = useCallback((ctx: CanvasRenderingContext2D, showGameOver: boolean, snake: Point[], foods: Point[], theme: 'dark' | 'light') => {
     const canvasSize = gridCells * gridCellSize
     
     // Set colors based on theme
@@ -171,8 +238,10 @@ const SnakeGame: React.FC = () => {
 
     // Food
     ctx.fillStyle = foodColor
-    roundedRect(ctx, food.x * gridCellSize, food.y * gridCellSize, gridCellSize, gridCellSize, 4)
-    ctx.fill()
+    foods.forEach(food => {
+      roundedRect(ctx, food.x * gridCellSize, food.y * gridCellSize, gridCellSize, gridCellSize, 4)
+      ctx.fill()
+    })
 
     // Snake
     ctx.fillStyle = snakeColor
@@ -202,12 +271,6 @@ const SnakeGame: React.FC = () => {
     ctx.arcTo(x, y, x + w, y, r)
     ctx.closePath()
   }
-
-  // Create ref for food to access latest value in draw function
-  const foodRef = useRef<Point>(food)
-  useEffect(() => {
-    foodRef.current = food
-  }, [food])
   
   // Draw on canvas when state changes
   useEffect(() => {
@@ -217,9 +280,9 @@ const SnakeGame: React.FC = () => {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    console.log(`Drawing frame - Food at (${food.x}, ${food.y}) with ${theme} theme`)
-    draw(ctx, gameOver, snake, food, theme)
-  }, [snake, gameOver, food, draw, theme])
+    console.log(`Drawing frame - Foods: ${foods.length} items with ${theme} theme`)
+    draw(ctx, gameOver, snake, foods, theme)
+  }, [snake, gameOver, foods, theme, draw])
 
   // Keyboard controls
   const handleKey = useCallback((e: KeyboardEvent) => {
@@ -236,7 +299,7 @@ const SnakeGame: React.FC = () => {
     } else if ((key === 'arrowright' || key === 'd') && !isHorizontal) {
       setNextDirection({ x: 1, y: 0 })
     }
-  }, [direction])
+  }, [direction, setNextDirection])
 
   // Touch controls
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -272,13 +335,14 @@ const SnakeGame: React.FC = () => {
     }
 
     document.addEventListener('touchmove', handleTouchMove, { passive: true })
-  }, [direction])
+  }, [direction, setNextDirection])
 
   // Event listeners
   useEffect(() => {
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [handleKey])
+  
 
   // Speed mode toggle
   const toggleSpeedMode = () => {
@@ -326,7 +390,7 @@ const SnakeGame: React.FC = () => {
         </button>
       </div>
       <footer>
-        <p>Use arrow keys or WASD to move. Avoid walls and yourself. Food is static and only appears at fixed positions.</p>
+        <p>Use arrow keys or WASD to move. Avoid walls and yourself.</p>
       </footer>
     </div>
   )
