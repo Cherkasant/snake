@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { atom, useAtom } from 'jotai'
+import { themeColors } from '../colors'
 
 type Point = { x: number; y: number }
 
@@ -10,7 +11,7 @@ const nextDirectionAtom = atom<Point>({ x: 1, y: 0 })
 const foodsAtom = atom<Point[]>([])
 const scoreAtom = atom<number>(0)
 const gameOverAtom = atom<boolean>(false)
-const speedModeAtom = atom<'Slow' | 'Normal' | 'Fast'>('Normal')
+const difficultyAtom = atom<'Easy' | 'Medium' | 'Hard'>('Medium')
 const themeAtom = atom<'dark' | 'light'>('dark')
 // Food log for analysis
 const foodLogAtom = atom<{position: Point, timestamp: number}[]>([])
@@ -29,7 +30,7 @@ const SnakeGame: React.FC = () => {
   const [foods, setFoods] = useAtom(foodsAtom)
   const [score, setScore] = useAtom(scoreAtom)
   const [gameOver, setGameOver] = useAtom(gameOverAtom)
-  const [speedMode, setSpeedMode] = useAtom(speedModeAtom)
+  const [difficulty, setDifficulty] = useAtom(difficultyAtom)
   const [theme, setTheme] = useAtom(themeAtom)
   const [, setFoodLog] = useAtom(foodLogAtom)
   const [recentFoods, setRecentFoods] = useAtom(recentFoodsAtom)
@@ -52,9 +53,11 @@ const SnakeGame: React.FC = () => {
 
   // Calculate current speed based on mode only (no score acceleration)
   const getCurrentSpeed = useCallback(() => {
-    const multiplier = speedMode === 'Slow' ? 1.25 : speedMode === 'Fast' ? 0.75 : 1.0
+    const multiplier =
+      difficulty === 'Easy' ? 1.5 :
+      difficulty === 'Hard' ? 0.75 : 1.0
     return Math.round(baseSpeedMs * multiplier)
-  }, [speedMode])
+  }, [difficulty])
 
   // Food is static - doesn't move
 
@@ -207,20 +210,15 @@ const SnakeGame: React.FC = () => {
   const draw = useCallback((ctx: CanvasRenderingContext2D, showGameOver: boolean, snake: Point[], foods: Point[], theme: 'dark' | 'light') => {
     const canvasSize = gridCells * gridCellSize
     
-    // Set colors based on theme
-    const backgroundColor = theme === 'dark' ? '#0f172a' : '#f1f5f9'
-    const gridColor = theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.1)'
-    const foodColor = theme === 'dark' ? '#ef4444' : '#dc2626'
-    const snakeColor = theme === 'dark' ? '#22c55e' : '#16a34a'
-    const gameOverBg = theme === 'dark' ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.7)'
-    const gameOverText = theme === 'dark' ? '#e5e7eb' : '#1e293b'
+    // Get colors based on theme
+    const colors = themeColors[theme]
 
     // Background
-    ctx.fillStyle = backgroundColor
+    ctx.fillStyle = colors.backgroundColor
     ctx.fillRect(0, 0, canvasSize, canvasSize)
 
     // Grid (subtle)
-    ctx.strokeStyle = gridColor
+    ctx.strokeStyle = colors.gridColor
     ctx.lineWidth = 1
     for (let i = 0; i <= gridCells; i++) {
       const p = i * gridCellSize + 0.5
@@ -236,14 +234,14 @@ const SnakeGame: React.FC = () => {
     }
 
     // Food
-    ctx.fillStyle = foodColor
+    ctx.fillStyle = colors.foodColor
     foods.forEach(food => {
       roundedRect(ctx, food.x * gridCellSize, food.y * gridCellSize, gridCellSize, gridCellSize, 4)
       ctx.fill()
     })
 
     // Snake
-    ctx.fillStyle = snakeColor
+    ctx.fillStyle = colors.snakeColor
     snake.forEach((segment, index) => {
       const radius = index === 0 ? 6 : 4
       roundedRect(ctx, segment.x * gridCellSize, segment.y * gridCellSize, gridCellSize, gridCellSize, radius)
@@ -251,9 +249,9 @@ const SnakeGame: React.FC = () => {
     })
 
     if (showGameOver) {
-      ctx.fillStyle = gameOverBg
+      ctx.fillStyle = colors.gameOverBg
       ctx.fillRect(0, 0, canvasSize, canvasSize)
-      ctx.fillStyle = gameOverText
+      ctx.fillStyle = colors.gameOverText
       ctx.textAlign = 'center'
       ctx.font = 'bold 24px system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial'
       ctx.fillText('Game Over - Press Restart', canvasSize / 2, canvasSize / 2)
@@ -343,12 +341,12 @@ const SnakeGame: React.FC = () => {
   }, [handleKey])
   
 
-  // Speed mode toggle
-  const toggleSpeedMode = () => {
-    setSpeedMode(prev => {
-      if (prev === 'Slow') return 'Normal'
-      if (prev === 'Normal') return 'Fast'
-      return 'Slow'
+  // Difficulty toggle
+  const toggleDifficulty = () => {
+    setDifficulty(prev => {
+      if (prev === 'Easy') return 'Medium'
+      if (prev === 'Medium') return 'Hard'
+      return 'Easy'
     })
   }
 
@@ -366,7 +364,7 @@ const SnakeGame: React.FC = () => {
           <span>Score: </span><span>{score}</span>
         </div>
         <div className="scoreboard">
-          <span>Speed: </span><span>{getCurrentSpeed()}ms</span>
+          <span>Difficulty: </span><span>{difficulty}</span>
         </div>
       </header>
       <canvas 
@@ -381,8 +379,8 @@ const SnakeGame: React.FC = () => {
         <button onClick={resetGame} aria-label="Restart game">
           Restart
         </button>
-        <button onClick={toggleSpeedMode} aria-label="Change speed">
-          Speed: {speedMode}
+        <button onClick={toggleDifficulty} aria-label="Change difficulty">
+          Difficulty: {difficulty}
         </button>
         <button onClick={toggleTheme} aria-label="Toggle theme">
           Theme: {theme === 'dark' ? 'Dark' : 'Light'}
