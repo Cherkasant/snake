@@ -32,6 +32,11 @@ const SnakeGame: React.FC = () => {
   const [gameOver, setGameOver] = useAtom(gameOverAtom)
   const [difficulty, setDifficulty] = useAtom(difficultyAtom)
   const [theme, setTheme] = useAtom(themeAtom)
+
+  // Set theme attribute for CSS variables
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
   const [, setFoodLog] = useAtom(foodLogAtom)
   const [recentFoods, setRecentFoods] = useAtom(recentFoodsAtom)
   const [isRespawnScheduled, setIsRespawnScheduled] = useState<boolean>(false)
@@ -365,6 +370,13 @@ const SnakeGame: React.FC = () => {
   // Difficulty selector for start screen
   const handleDifficultyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setDifficulty(e.target.value as 'Easy' | 'Medium' | 'Hard')
+  }
+
+  // Color-code difficulty descriptions
+  const difficultyColors = {
+    Easy: themeColors[theme].snakeColor,
+    Medium: '#eab308', // Amber for medium
+    Hard: themeColors[theme].foodColor
   }
 
   if (!isStarted) {
