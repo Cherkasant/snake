@@ -13,8 +13,6 @@ const scoreAtom = atom<number>(0)
 const gameOverAtom = atom<boolean>(false)
 const difficultyAtom = atom<'Easy' | 'Medium' | 'Hard'>('Medium')
 const themeAtom = atom<'dark' | 'light'>('dark')
-// Food log for analysis
-const foodLogAtom = atom<{position: Point, timestamp: number}[]>([])
 // Track recent food positions to avoid repetition
 const recentFoodsAtom = atom<Point[]>([])
 
@@ -37,10 +35,18 @@ const SnakeGame: React.FC = () => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
-  const [, setFoodLog] = useAtom(foodLogAtom)
   const [recentFoods, setRecentFoods] = useAtom(recentFoodsAtom)
   const [isRespawnScheduled, setIsRespawnScheduled] = useState<boolean>(false)
   const [isStarted, setIsStarted] = useState<boolean>(false)
+
+  // Additional refs for optimization
+  const foodsRef = useRef(foods)
+  const directionRef = useRef(direction)
+
+  useEffect(() => {
+    foodsRef.current = foods
+    directionRef.current = direction
+  }, [foods, direction])
 
   // Refs to access current state in callbacks
   const snakeRef = useRef(snake)
@@ -79,11 +85,6 @@ const SnakeGame: React.FC = () => {
       const onSnake = snakeRef.current.some(s => s.x === position.x && s.y === position.y)
       const inRecent = recentFoodsRef.current.some(f => f.x === position.x && f.y === position.y)
       if (!onSnake && !inRecent) {
-        // Log food position with timestamp
-        setFoodLog(prev => [...prev, {
-          position: {x: position.x, y: position.y},
-          timestamp: Date.now()
-        }])
         // Update recent foods (keep last 5 positions)
         setRecentFoods(prev => {
           const updated = [...prev, position]
@@ -92,12 +93,11 @@ const SnakeGame: React.FC = () => {
         return [position]
       }
     }
-  }, [gridCells, snake]) // Depends on gridCells and current snake state
+  }, [gridCells]) // Use snakeRef.current inside, no dep on snake
 
   // Initialize food separately
   const initFood = useCallback(() => {
     const newFoods = spawnFood()
-    console.log(`Initial foods: ${newFoods.length} items`)
     setFoods(newFoods)
   }, [spawnFood, setFoods])
 
@@ -111,11 +111,10 @@ const SnakeGame: React.FC = () => {
     setNextDirection({ x: 1, y: 0 })
     setScore(0)
     setGameOver(false)
-    setFoodLog([]) // Reset food log on game restart
     setRecentFoods([]) // Reset recent foods on restart
     lastTickRef.current = 0
     // Food spawned in startGame
-  }, [setSnake, setDirection, setNextDirection, setScore, setGameOver, setFoodLog, setRecentFoods, setIsStarted, setFoods])
+  }, [setSnake, setDirection, setNextDirection, setScore, setGameOver, setRecentFoods, setIsStarted, setFoods])
 
 
 
@@ -127,7 +126,6 @@ const SnakeGame: React.FC = () => {
     setNextDirection({ x: 1, y: 0 })
     setScore(0)
     setGameOver(false)
-    setFoodLog([])
     setRecentFoods([])
     lastTickRef.current = 0
     // Food spawned in startGame
@@ -167,12 +165,11 @@ const SnakeGame: React.FC = () => {
       const newSnake = [newHead, ...prevSnake]
       
       // Check if head collides with food
-      if (foods.length > 0) {
-        const foodIndex = foods.findIndex(f => f.x === newHead.x && f.y === newHead.y)
+      if (foodsRef.current.length > 0) {
+        const foodIndex = foodsRef.current.findIndex(f => f.x === newHead.x && f.y === newHead.y)
         const ateFood = foodIndex !== -1
-
+    
         if (ateFood) {
-          console.log(`Food eaten at (${foods[foodIndex].x}, ${foods[foodIndex].y})!`)
           setScore(prevScore => prevScore + 1)
           setFoods([]) // Remove food
           
@@ -195,7 +192,7 @@ const SnakeGame: React.FC = () => {
     })
 
     gameLoopRef.current = requestAnimationFrame(gameLoop)
-  }, [gameOver, nextDirection, getCurrentSpeed, spawnFood, setSnake, setDirection, setGameOver, setScore, setFoods, foods])
+  }, [gameOver, nextDirection, getCurrentSpeed, spawnFood, setSnake, setDirection, setGameOver, setScore, setFoods])
 
   // Start game loop only if started
   useEffect(() => {
@@ -279,16 +276,15 @@ const SnakeGame: React.FC = () => {
 
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-
-    console.log(`Drawing frame - Foods: ${foods.length} items with ${theme} theme`)
+  
     draw(ctx, gameOver, snake, foods, theme)
   }, [snake, gameOver, foods, theme, draw, isStarted])
 
   // Keyboard controls
   const handleKey = useCallback((e: KeyboardEvent) => {
     const key = e.key.toLowerCase()
-    const isHorizontal = direction.x !== 0
-    const isVertical = direction.y !== 0
+    const isHorizontal = directionRef.current.x !== 0
+    const isVertical = directionRef.current.y !== 0
 
     if ((key === 'arrowup' || key === 'w') && !isVertical) {
       setNextDirection({ x: 0, y: -1 })
@@ -299,7 +295,7 @@ const SnakeGame: React.FC = () => {
     } else if ((key === 'arrowright' || key === 'd') && !isHorizontal) {
       setNextDirection({ x: 1, y: 0 })
     }
-  }, [direction, setNextDirection])
+  }, [setNextDirection])
 
   // Touch controls
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -320,8 +316,8 @@ const SnakeGame: React.FC = () => {
 
       if (Math.abs(dx) + Math.abs(dy) < 10) return
 
-      const isHorizontal = direction.x !== 0
-      const isVertical = direction.y !== 0
+      const isHorizontal = directionRef.current.x !== 0
+      const isVertical = directionRef.current.y !== 0
 
       if (Math.abs(dx) > Math.abs(dy)) {
         if (dx > 0 && !isHorizontal) setNextDirection({ x: 1, y: 0 })
@@ -335,7 +331,7 @@ const SnakeGame: React.FC = () => {
     }
 
     document.addEventListener('touchmove', handleTouchMove, { passive: true })
-  }, [direction, setNextDirection])
+  }, [setNextDirection])
 
   // Event listeners
   useEffect(() => {
@@ -370,13 +366,6 @@ const SnakeGame: React.FC = () => {
   // Difficulty selector for start screen
   const handleDifficultyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setDifficulty(e.target.value as 'Easy' | 'Medium' | 'Hard')
-  }
-
-  // Color-code difficulty descriptions
-  const difficultyColors = {
-    Easy: themeColors[theme].snakeColor,
-    Medium: '#eab308', // Amber for medium
-    Hard: themeColors[theme].foodColor
   }
 
   if (!isStarted) {
